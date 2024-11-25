@@ -20,6 +20,10 @@ def get_pipeline():
                 use_auth_token=os.environ["HUGGINGFACE_TOKEN"]
             ).to(device)
             
+            # Отключаем проверку безопасности
+            pipe.safety_checker = None
+            pipe.requires_safety_checking = False
+            
             # Optimize memory usage
             pipe.enable_attention_slicing()
             if device == "cuda":
@@ -50,8 +54,8 @@ class PixelArtGenerator:
         Generate high-quality pixel art from a text prompt
         """
         # Enhance prompt for pixel art style with improved aesthetics
-        enhanced_prompt = f"pixel art style, {prompt}, highly detailed pixel art, 8-bit style, vibrant colors, clear outlines, clean pixel art, {prompt}, sharp pixels, retro game art style, clear composition"
-        negative_prompt = "blur, realistic, 3d, photographic, high resolution, painting, anime, sketch, watercolor, abstract, distorted, blurry, noisy, messy, undefined"
+        enhanced_prompt = f"cute pixel art style, {prompt}, simple pixelated artwork, retro gaming style, minimalist pixel design, clean shapes, 8-bit style, vibrant colors, clear outlines"
+        negative_prompt = "inappropriate, offensive, nsfw, dark, scary, horror, blur, realistic, 3d, photographic, high resolution, painting, anime, sketch, watercolor, abstract, distorted, blurry, noisy, messy, undefined"
         
         # Create progress bar
         progress_bar = st.progress(0)
@@ -65,7 +69,8 @@ class PixelArtGenerator:
         try:
             # Generate image with optimizations
             with torch.no_grad():
-                image = self.pipe(
+                try:
+                    image = self.pipe(
                     prompt=enhanced_prompt,
                     negative_prompt=negative_prompt,
                     num_inference_steps=30,
@@ -76,6 +81,11 @@ class PixelArtGenerator:
                     callback_steps=1,
                     batch_size=1  # Оптимизация использования памяти
                 ).images[0]
+                except Exception as e:
+                    if "NSFWDetected" in str(e):
+                        st.error("Контент определен как небезопасный. Пожалуйста, измените описание.")
+                        raise ValueError("Обнаружен небезопасный контент. Попробуйте другое описание.")
+                    raise e
                 
             # Clear CUDA cache after generation
             if self.device == "cuda":
