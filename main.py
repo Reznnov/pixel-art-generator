@@ -32,21 +32,21 @@ def main():
     image_size = st.sidebar.select_slider(
         "Image Size",
         options=[32, 64, 128],
-        value=64
+        value=128
     )
     
     pixel_size = st.sidebar.slider(
         "Pixel Size",
         min_value=2,
         max_value=8,
-        value=4
+        value=3
     )
     
     style_strength = st.sidebar.slider(
         "Pixelation Strength",
         min_value=0.1,
         max_value=1.0,
-        value=0.8,
+        value=0.9,
         step=0.1
     )
 
