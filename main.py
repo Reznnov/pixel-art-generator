@@ -17,6 +17,14 @@ def main():
     
     st.title("🎨 Pixel Art Generator")
     st.write("Generate unique pixel art from text descriptions!")
+    
+    st.markdown('''
+    💡 **Tips for better results:**
+    - Be specific in your description
+    - Include colors and details
+    - Specify the perspective (front view, side view, etc.)
+    - Example: "a cute orange cat wearing a space helmet, front view, pixel art style"
+    ''')
 
     # Sidebar controls
     st.sidebar.header("Generation Settings")

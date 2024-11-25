@@ -5,7 +5,7 @@ import numpy as np
 
 class PixelArtGenerator:
     def __init__(self):
-        self.model_id = "stabilityai/stable-diffusion-2-1"
+        self.model_id = "CompVis/stable-diffusion-v1-4"
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.pipe = StableDiffusionPipeline.from_pretrained(
             self.model_id,
@@ -24,25 +24,25 @@ class PixelArtGenerator:
         import streamlit as st
 
         # Enhance prompt for pixel art style
-        enhanced_prompt = f"pixel art style, 8-bit, {prompt}, high quality, detailed"
-        negative_prompt = "blur, realistic, 3d, photographic, high resolution"
+        enhanced_prompt = f"pixel art style, {prompt}, highly detailed pixel art, 16-bit, clean pixel art, {prompt}, sharp pixels, retro game art style, clear composition"
+        negative_prompt = "blur, realistic, 3d, photographic, high resolution, painting, anime, sketch, watercolor, abstract, distorted"
         
         # Create progress bar
         progress_bar = st.progress(0)
         status_text = st.empty()
         
         def callback_fn(step: int, timestep: int, latents: torch.FloatTensor):
-            progress = (step + 1) / 20  # 20 is the new num_inference_steps
+            progress = (step + 1) / 30  # 30 is the new num_inference_steps
             progress_bar.progress(progress)
-            status_text.text(f"Generating image... Step {step + 1}/20")
+            status_text.text(f"Generating image... Step {step + 1}/30")
             
         # Generate image with optimizations
         with torch.no_grad():
             image = self.pipe(
                 prompt=enhanced_prompt,
                 negative_prompt=negative_prompt,
-                num_inference_steps=20,
-                guidance_scale=7.5,
+                num_inference_steps=30,
+                guidance_scale=9.0,
                 width=size,
                 height=size,
                 callback=callback_fn,
