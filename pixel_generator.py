@@ -32,7 +32,8 @@ class PixelArtGenerator:
         status_text = st.empty()
         
         def callback_fn(step: int, timestep: int, latents: torch.FloatTensor):
-            progress = (step + 1) / 30  # 30 is the new num_inference_steps
+            # Используем min() чтобы гарантировать, что прогресс не превысит 1.0
+            progress = min((step + 1) / 30, 1.0)  
             progress_bar.progress(progress)
             status_text.text(f"Generating image... Step {step + 1}/30")
             
