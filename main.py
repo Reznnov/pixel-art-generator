@@ -47,42 +47,76 @@ def main():
             return
 
         try:
-            with st.spinner("Generating pixel art..."):
-                # Check cache first
-                cached_result = get_cached_result(prompt, image_size, pixel_size, style_strength)
+            import signal
+            from contextlib import contextmanager
+            import torch
+            
+            @contextmanager
+            def timeout(seconds):
+                def handler(signum, frame):
+                    raise TimeoutError("Generation took too long!")
                 
-                if cached_result is not None:
-                    generated_image = cached_result
-                else:
-                    # Generate new image
-                    generator = PixelArtGenerator()
-                    raw_image = generator.generate(
-                        prompt,
-                        size=image_size,
-                        style_strength=style_strength
-                    )
-                    
-                    # Post-process the image
-                    generated_image = post_process_image(
-                        raw_image,
-                        pixel_size=pixel_size
-                    )
-                    
-                    # Cache the result
-                    cache_result(prompt, generated_image, image_size, pixel_size, style_strength)
+                # Register the signal function handler
+                signal.signal(signal.SIGALRM, handler)
+                signal.alarm(seconds)
+                
+                try:
+                    yield
+                finally:
+                    # Disable the alarm
+                    signal.alarm(0)
+            
+            # Check cache first
+            st.info("Checking cache for similar generations...")
+            cached_result = get_cached_result(prompt, image_size, pixel_size, style_strength)
+            
+            if cached_result is not None:
+                st.success("Found cached result!")
+                generated_image = cached_result
+            else:
+                st.info("No cached version found. Starting new generation...")
+                
+                try:
+                    with timeout(180):  # 3 minutes timeout
+                        # Generate new image
+                        generator = PixelArtGenerator()
+                        raw_image = generator.generate(
+                            prompt,
+                            size=image_size,
+                            style_strength=style_strength
+                        )
+                        
+                        st.info("Applying pixel art post-processing...")
+                        # Post-process the image
+                        generated_image = post_process_image(
+                            raw_image,
+                            pixel_size=pixel_size
+                        )
+                        
+                        st.info("Caching the result...")
+                        # Cache the result
+                        cache_result(prompt, generated_image, image_size, pixel_size, style_strength)
+                        
+                except torch.cuda.OutOfMemoryError:
+                    st.error("Не хватает памяти GPU. Попробуйте уменьшить размер изображения или очистить кэш GPU.")
+                    return
+                except TimeoutError:
+                    st.error("Генерация заняла слишком много времени. Попробуйте еще раз или измените параметры.")
+                    return
 
-                # Display the result
-                st.image(generated_image, caption="Generated Pixel Art")
+            # Display the result
+            st.success("Generation completed successfully!")
+            st.image(generated_image, caption="Generated Pixel Art")
                 
                 # Add download button
-                buf = io.BytesIO()
-                generated_image.save(buf, format="PNG")
-                st.download_button(
-                    label="Download Image",
-                    data=buf.getvalue(),
-                    file_name="pixel_art.png",
-                    mime="image/png"
-                )
+            buf = io.BytesIO()
+            generated_image.save(buf, format="PNG")
+            st.download_button(
+                label="Download Image",
+                data=buf.getvalue(),
+                file_name="pixel_art.png",
+                mime="image/png"
+            )
 
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
