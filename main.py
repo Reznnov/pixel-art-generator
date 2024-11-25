@@ -75,19 +75,37 @@ def main():
                 st.info("No cached version found. Starting new generation...")
                 
                 # Set up timeout
-                timer = Timer(180.0, timeout_handler)  # 3 minutes timeout
+                timer = Timer(300.0, timeout_handler)  # 5 minutes timeout
+                max_retries = 3
+                retry_count = 0
+                network_error = None
+
                 try:
                     timer.start()
-                    # Generate new image
-                    generator = PixelArtGenerator()
-                    raw_image = generator.generate(
-                        prompt,
-                        size=image_size,
-                        style_strength=style_strength
-                    )
-                    
+                    # Generate new image with retries
+                    while retry_count < max_retries:
+                        try:
+                            generator = PixelArtGenerator()
+                            raw_image = generator.generate(
+                                prompt,
+                                size=image_size,
+                                style_strength=style_strength
+                            )
+                            network_error = None
+                            break
+                        except (ConnectionError, TimeoutError) as e:
+                            network_error = e
+                            retry_count += 1
+                            if retry_count < max_retries:
+                                st.warning(f"Попытка подключения {retry_count} из {max_retries}...")
+                                continue
+                            raise ConnectionError("Не удалось подключиться к серверу после нескольких попыток. Пожалуйста, проверьте подключение к интернету.")
+
                     if st.session_state.generation_timeout:
                         raise TimeoutError("Generation took too long!")
+                    
+                    if network_error:
+                        raise network_error
                     
                     st.info("Applying pixel art post-processing...")
                     # Post-process the image
@@ -124,8 +142,12 @@ def main():
                 mime="image/png"
             )
 
+        except ConnectionError as e:
+            st.error(f"Ошибка сети: {str(e)}\nПожалуйста, проверьте подключение к интернету и попробуйте снова.")
+        except TimeoutError as e:
+            st.error(f"Превышено время ожидания: {str(e)}\nСервер не отвечает, попробуйте позже.")
         except Exception as e:
-            st.error(f"An error occurred: {str(e)}")
+            st.error(f"Произошла ошибка: {str(e)}\nПожалуйста, попробуйте еще раз или обратитесь в поддержку.")
 
 if __name__ == "__main__":
     main()

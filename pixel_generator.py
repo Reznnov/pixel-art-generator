@@ -7,9 +7,11 @@ class PixelArtGenerator:
     def __init__(self):
         self.model_id = "CompVis/stable-diffusion-v1-4"
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        import os
         self.pipe = StableDiffusionPipeline.from_pretrained(
             self.model_id,
-            torch_dtype=torch.float32
+            torch_dtype=torch.float32,
+            use_auth_token=os.environ["HUGGINGFACE_TOKEN"]
         ).to(self.device)
         
         # Optimize memory usage
