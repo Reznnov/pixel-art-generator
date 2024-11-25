@@ -4,8 +4,15 @@ from image_processor import post_process_image
 from cache_manager import get_cached_result, cache_result
 from utils import validate_prompt, setup_page
 import io
+import threading
+from threading import Timer
+
+def timeout_handler():
+    st.session_state.generation_timeout = True
 
 def main():
+    if 'generation_timeout' not in st.session_state:
+        st.session_state.generation_timeout = False
     setup_page()
     
     st.title("🎨 Pixel Art Generator")
@@ -47,24 +54,7 @@ def main():
             return
 
         try:
-            import signal
-            from contextlib import contextmanager
             import torch
-            
-            @contextmanager
-            def timeout(seconds):
-                def handler(signum, frame):
-                    raise TimeoutError("Generation took too long!")
-                
-                # Register the signal function handler
-                signal.signal(signal.SIGALRM, handler)
-                signal.alarm(seconds)
-                
-                try:
-                    yield
-                finally:
-                    # Disable the alarm
-                    signal.alarm(0)
             
             # Check cache first
             st.info("Checking cache for similar generations...")
@@ -76,33 +66,41 @@ def main():
             else:
                 st.info("No cached version found. Starting new generation...")
                 
+                # Set up timeout
+                timer = Timer(180.0, timeout_handler)  # 3 minutes timeout
                 try:
-                    with timeout(180):  # 3 minutes timeout
-                        # Generate new image
-                        generator = PixelArtGenerator()
-                        raw_image = generator.generate(
-                            prompt,
-                            size=image_size,
-                            style_strength=style_strength
-                        )
-                        
-                        st.info("Applying pixel art post-processing...")
-                        # Post-process the image
-                        generated_image = post_process_image(
-                            raw_image,
-                            pixel_size=pixel_size
-                        )
-                        
-                        st.info("Caching the result...")
-                        # Cache the result
-                        cache_result(prompt, generated_image, image_size, pixel_size, style_strength)
-                        
+                    timer.start()
+                    # Generate new image
+                    generator = PixelArtGenerator()
+                    raw_image = generator.generate(
+                        prompt,
+                        size=image_size,
+                        style_strength=style_strength
+                    )
+                    
+                    if st.session_state.generation_timeout:
+                        raise TimeoutError("Generation took too long!")
+                    
+                    st.info("Applying pixel art post-processing...")
+                    # Post-process the image
+                    generated_image = post_process_image(
+                        raw_image,
+                        pixel_size=pixel_size
+                    )
+                    
+                    st.info("Caching the result...")
+                    # Cache the result
+                    cache_result(prompt, generated_image, image_size, pixel_size, style_strength)
+                    
                 except torch.cuda.OutOfMemoryError:
                     st.error("Не хватает памяти GPU. Попробуйте уменьшить размер изображения или очистить кэш GPU.")
                     return
                 except TimeoutError:
                     st.error("Генерация заняла слишком много времени. Попробуйте еще раз или измените параметры.")
                     return
+                finally:
+                    timer.cancel()
+                    st.session_state.generation_timeout = False
 
             # Display the result
             st.success("Generation completed successfully!")
