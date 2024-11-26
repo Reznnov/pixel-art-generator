@@ -4,7 +4,6 @@ from image_processor import post_process_image
 from cache_manager import get_cached_result, cache_result
 from utils import validate_prompt, setup_page
 import io
-import threading
 from threading import Timer
 
 def timeout_handler():
@@ -62,8 +61,6 @@ def main():
             return
 
         try:
-            import torch
-            
             # Check cache first
             st.info("Checking cache for similar generations...")
             cached_result = get_cached_result(prompt, image_size, pixel_size, style_strength)
@@ -118,9 +115,6 @@ def main():
                     # Cache the result
                     cache_result(prompt, generated_image, image_size, pixel_size, style_strength)
                     
-                except torch.cuda.OutOfMemoryError:
-                    st.error("Не хватает памяти GPU. Попробуйте уменьшить размер изображения или очистить кэш GPU.")
-                    return
                 except TimeoutError:
                     st.error("Генерация заняла слишком много времени. Попробуйте еще раз или измените параметры.")
                     return
@@ -132,7 +126,7 @@ def main():
             st.success("Generation completed successfully!")
             st.image(generated_image, caption="Generated Pixel Art")
                 
-                # Add download button
+            # Add download button
             buf = io.BytesIO()
             generated_image.save(buf, format="PNG")
             st.download_button(

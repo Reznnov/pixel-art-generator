@@ -1,36 +1,16 @@
-import torch
-from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
-from PIL import Image
-import numpy as np
-import streamlit as st
-import gc
 import os
+from huggingface_hub import InferenceClient
+from PIL import Image
+import streamlit as st
 
 @st.cache_resource
-def get_pipeline():
-    """Initialize and return the StableDiffusion pipeline with optimized settings"""
+def get_client():
     with st.spinner("Загрузка AI модели..."):
         try:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            model_id = "CompVis/stable-diffusion-v1-4"
-            
-            pipe = StableDiffusionPipeline.from_pretrained(
-                model_id,
-                torch_dtype=torch.float32,
-                use_auth_token=os.environ["HUGGINGFACE_TOKEN"]
-            ).to(device)
-            
-            # Отключаем проверку безопасности
-            pipe.safety_checker = None
-            pipe.requires_safety_checking = False
-            
-            # Optimize memory usage
-            pipe.enable_attention_slicing()
-            if device == "cuda":
-                pipe.enable_vae_tiling()
-            
-            return pipe
-            
+            return InferenceClient(
+                "nerijs/pixel-art-xl",
+                token=os.environ["HUGGINGFACE_TOKEN"]
+            )
         except Exception as e:
             st.error(f"Ошибка при инициализации модели: {str(e)}")
             raise
@@ -41,64 +21,26 @@ class PixelArtGenerator:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance.device = "cuda" if torch.cuda.is_available() else "cpu"
             try:
-                cls._instance.pipe = get_pipeline()
+                cls._instance.client = get_client()
             except Exception as e:
                 st.error("Не удалось инициализировать генератор. Попробуйте перезагрузить страницу.")
                 raise
         return cls._instance
 
     def generate(self, prompt: str, size: int = 128, style_strength: float = 0.8) -> Image.Image:
-        """
-        Generate high-quality pixel art from a text prompt
-        """
-        # Enhance prompt for pixel art style with improved aesthetics
-        enhanced_prompt = f"cute pixel art style, {prompt}, simple pixelated artwork, retro gaming style, minimalist pixel design, clean shapes, 8-bit style, vibrant colors, clear outlines"
-        negative_prompt = "inappropriate, offensive, nsfw, dark, scary, horror, blur, realistic, 3d, photographic, high resolution, painting, anime, sketch, watercolor, abstract, distorted, blurry, noisy, messy, undefined"
-        
-        # Create progress bar
         progress_bar = st.progress(0)
         status_text = st.empty()
         
-        def callback_fn(step: int, timestep: int, latents: torch.FloatTensor):
-            progress = min((step + 1) / 30, 1.0)
-            progress_bar.progress(progress)
-            status_text.text(f"Генерация изображения... Шаг {step + 1}/30")
-            
         try:
-            # Generate image with optimizations
-            raw_image = None
-            with torch.no_grad():
-                try:
-                    result = self.pipe(
-                        prompt=enhanced_prompt,
-                        negative_prompt=negative_prompt,
-                        num_inference_steps=30,
-                        guidance_scale=12.0,
-                        width=size,
-                        height=size,
-                        callback=callback_fn,
-                        callback_steps=1,
-                        batch_size=1
-                    )
-                    raw_image = result.images[0]
-                    if raw_image is None:
-                        raise ValueError("Не удалось сгенерировать изображение")
-                except Exception as e:
-                    if "NSFWDetected" in str(e):
-                        st.error("Контент определен как небезопасный. Пожалуйста, измените описание.")
-                        raise ValueError("Обнаружен небезопасный контент. Попробуйте другое описание.")
-                    raise e
-                
-            # Clear CUDA cache after generation
-            if self.device == "cuda":
-                torch.cuda.empty_cache()
-                gc.collect()  # Запуск сборщика мусора
-                
-            # Clear progress indicators
-            progress_bar.empty()
+            status_text.text("Генерация пиксель арта...")
+            progress_bar.progress(0.5)
+            
+            image = self.client.text_to_image(prompt)
+            
+            progress_bar.progress(1.0)
             status_text.empty()
+            progress_bar.empty()
             
             return image
             
@@ -107,11 +49,3 @@ class PixelArtGenerator:
             status_text.empty()
             st.error(f"Ошибка при генерации изображения: {str(e)}")
             raise
-            
-    def __del__(self):
-        # Clean up CUDA memory
-        if hasattr(self, 'pipe'):
-            del self.pipe
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            gc.collect()
