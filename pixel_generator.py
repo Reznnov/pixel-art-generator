@@ -68,19 +68,23 @@ class PixelArtGenerator:
             
         try:
             # Generate image with optimizations
+            raw_image = None
             with torch.no_grad():
                 try:
-                    image = self.pipe(
-                    prompt=enhanced_prompt,
-                    negative_prompt=negative_prompt,
-                    num_inference_steps=30,
-                    guidance_scale=12.0,
-                    width=size,
-                    height=size,
-                    callback=callback_fn,
-                    callback_steps=1,
-                    batch_size=1  # Оптимизация использования памяти
-                ).images[0]
+                    result = self.pipe(
+                        prompt=enhanced_prompt,
+                        negative_prompt=negative_prompt,
+                        num_inference_steps=30,
+                        guidance_scale=12.0,
+                        width=size,
+                        height=size,
+                        callback=callback_fn,
+                        callback_steps=1,
+                        batch_size=1
+                    )
+                    raw_image = result.images[0]
+                    if raw_image is None:
+                        raise ValueError("Не удалось сгенерировать изображение")
                 except Exception as e:
                     if "NSFWDetected" in str(e):
                         st.error("Контент определен как небезопасный. Пожалуйста, измените описание.")

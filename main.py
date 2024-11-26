@@ -108,11 +108,11 @@ def main():
                         raise network_error
                     
                     st.info("Applying pixel art post-processing...")
-                    # Post-process the image
-                    generated_image = post_process_image(
-                        raw_image,
-                        pixel_size=pixel_size
-                    )
+                    # Validate and post-process the image
+                    if raw_image is not None:
+                        generated_image = post_process_image(raw_image, pixel_size=pixel_size)
+                    else:
+                        raise ValueError("Не удалось сгенерировать изображение")
                     
                     st.info("Caching the result...")
                     # Cache the result
