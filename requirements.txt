@@ -1,0 +1,5 @@
+streamlit==1.28.2
+Pillow==10.1.0
+numpy==1.26.2
+huggingface-hub==0.19.4
+python-dotenv==1.0.0
